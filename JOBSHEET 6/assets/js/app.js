@@ -9,57 +9,37 @@ function initNavToggle() {
     });
 }
 
-function updateCounter(table) {
-    const counter = document.getElementById("filter-counter");
-    if (!counter || !table) return;
-
-    const rows = table.querySelectorAll("tbody tr");
-    const total = rows.length;
-    let tampil = 0;
-    rows.forEach(function (row) {
-        if (row.style.display !== "none") tampil++;
-    });
-
-    const label = counter.dataset.label || "data";
-    counter.textContent = "Menampilkan " + tampil + " dari " + total + " " + label;
-}
-
 // ===== Konfirmasi hapus (front-end only, belum ke server) =====
-
+// Memakai event delegation di document karena baris tabel sekarang
+// dirender dinamis via fetch (lihat buku.js/anggota.js) sehingga
+// tombol .btn-hapus belum tentu ada saat DOMContentLoaded.
 function initHapusConfirm() {
     document.addEventListener("click", function (e) {
         const btn = e.target.closest(".btn-hapus");
         if (!btn) return;
 
-        const table = btn.closest(".table-responsive table");
         const row = btn.closest("tr");
         const nama = row ? row.querySelector("td")?.textContent : "data ini";
         const yakin = confirm("Yakin ingin menghapus \"" + nama + "\"?");
         if (yakin && row) {
             row.remove();
-            updateCounter(table);
         }
     });
 }
 
-// ===== Filter/pencarian tabel real-time (Latihan 8.4 no.3) =====
-
+// ===== Filter/pencarian tabel real-time =====
 function initTableFilter() {
     const input = document.getElementById("search-input");
     const table = document.querySelector(".table-responsive table");
     if (!input || !table) return;
 
-    const kolom = parseInt(input.dataset.searchCol || "0", 10);
-
     input.addEventListener("keyup", function () {
         const keyword = input.value.toLowerCase();
         const rows = table.querySelectorAll("tbody tr");
         rows.forEach(function (row) {
-            const cells = row.querySelectorAll("td");
-            const target = cells[kolom] ? cells[kolom].textContent.toLowerCase() : "";
-            row.style.display = target.includes(keyword) ? "" : "none";
+            const teks = row.textContent.toLowerCase();
+            row.style.display = teks.includes(keyword) ? "" : "none";
         });
-        updateCounter(table);
     });
 }
 
@@ -79,39 +59,6 @@ function hapusError(input) {
     }
 }
 
-const aturanValidasi = [
-    {
-        selector: "[name='judul'], [name='nama']",
-        wajib: true,
-        pesanWajib: "Field ini wajib diisi."
-    },
-    {
-        selector: "[name='pengarang']",
-        wajib: true,
-        pesanWajib: "Pengarang wajib diisi."
-    },
-    {
-        selector: "[name='tahun']",
-        tipe: "angka",
-        min: 1900,
-        max: 2026,
-        pesanRange: "Tahun harus di antara 1900-2026."
-    },
-    {
-        selector: "[name='stok']",
-        tipe: "angka",
-        min: 0,
-        pesanRange: "Stok tidak boleh negatif."
-    },
-    {
-
-        selector: "[name='isbn']",
-        wajib: false,
-        pola: /^[0-9-]+$/,
-        pesanPola: "ISBN hanya boleh berisi angka dan tanda hubung (-)."
-    }
-];
-
 function initValidasiForm() {
     const form = document.getElementById("form-tambah");
     if (!form) return;
@@ -119,37 +66,43 @@ function initValidasiForm() {
     form.addEventListener("submit", function (e) {
         let valid = true;
 
-        aturanValidasi.forEach(function (aturan) {
-            const field = form.querySelector(aturan.selector);
-            if (!field) return; // field ini tidak ada di form halaman ini, lewati
+        const judul = form.querySelector("[name='judul'], [name='nama']");
+        if (judul && judul.value.trim() === "") {
+            tampilkanError(judul, "Field ini wajib diisi.");
+            valid = false;
+        } else if (judul) {
+            hapusError(judul);
+        }
 
-            const nilai = field.value.trim();
+        const pengarang = form.querySelector("[name='pengarang']");
+        if (pengarang && pengarang.value.trim() === "") {
+            tampilkanError(pengarang, "Pengarang wajib diisi.");
+            valid = false;
+        } else if (pengarang) {
+            hapusError(pengarang);
+        }
 
-            if (aturan.wajib && nilai === "") {
-                tampilkanError(field, aturan.pesanWajib);
+        const tahun = form.querySelector("[name='tahun']");
+        if (tahun) {
+            const nilai = parseInt(tahun.value, 10);
+            if (isNaN(nilai) || nilai < 1900 || nilai > 2026) {
+                tampilkanError(tahun, "Tahun harus di antara 1900-2026.");
                 valid = false;
-                return;
+            } else {
+                hapusError(tahun);
             }
+        }
 
-            if (aturan.tipe === "angka" && nilai !== "") {
-                const angka = parseInt(nilai, 10);
-                const dibawahMin = aturan.min !== undefined && angka < aturan.min;
-                const diatasMax = aturan.max !== undefined && angka > aturan.max;
-                if (isNaN(angka) || dibawahMin || diatasMax) {
-                    tampilkanError(field, aturan.pesanRange);
-                    valid = false;
-                    return;
-                }
-            }
-
-            if (aturan.pola && nilai !== "" && !aturan.pola.test(nilai)) {
-                tampilkanError(field, aturan.pesanPola);
+        const stok = form.querySelector("[name='stok']");
+        if (stok) {
+            const nilai = parseInt(stok.value, 10);
+            if (isNaN(nilai) || nilai < 0) {
+                tampilkanError(stok, "Stok tidak boleh negatif.");
                 valid = false;
-                return;
+            } else {
+                hapusError(stok);
             }
-
-            hapusError(field);
-        });
+        }
 
         if (!valid) {
             e.preventDefault();
@@ -162,8 +115,4 @@ document.addEventListener("DOMContentLoaded", function () {
     initHapusConfirm();
     initTableFilter();
     initValidasiForm();
-
-    // Tampilkan counter awal ("Menampilkan 5 dari 5 buku") begitu halaman dimuat
-    const table = document.querySelector(".table-responsive table");
-    if (table) updateCounter(table);
 });
